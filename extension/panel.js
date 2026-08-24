@@ -1,6 +1,9 @@
 "use strict";
 
-const inspectedTabId = chrome.devtools.inspectedWindow.tabId;
+let inspectedTabId = null;
+let currentDashboardTab = null;
+let availableTabs = [];
+let tabRefreshTimer;
 const state = {
   captures: new Map(),
   selectedId: null,
@@ -19,7 +22,12 @@ const elements = {
   requestCount: document.querySelector("#requestCount"),
   requestList: document.querySelector("#requestList"),
   clearCaptureButton: document.querySelector("#clearCaptureButton"),
+  targetTabSelect: document.querySelector("#targetTabSelect"),
+  focusTargetButton: document.querySelector("#focusTargetButton"),
+  liveIndicator: document.querySelector("#liveIndicator"),
   emptyDetail: document.querySelector("#emptyDetail"),
+  emptyTitle: document.querySelector("#emptyTitle"),
+  emptyMessage: document.querySelector("#emptyMessage"),
   requestDetail: document.querySelector("#requestDetail"),
   detailMethod: document.querySelector("#detailMethod"),
   detailStatus: document.querySelector("#detailStatus"),
@@ -77,6 +85,205 @@ function showToast(text, isError) {
   toastTimer = setTimeout(function hideToast() {
     elements.toast.classList.remove("is-visible");
   }, 2400);
+}
+
+function requestedTabId() {
+  const raw = new URLSearchParams(location.search).get("tabId");
+  if (!raw) {
+    return null;
+  }
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function tabUrl(tab) {
+  return String((tab && (tab.url || tab.pendingUrl)) || "");
+}
+
+function isInspectableTab(tab) {
+  return (
+    tab &&
+    Number.isInteger(tab.id) &&
+    /^https?:\/\//i.test(tabUrl(tab))
+  );
+}
+
+function sortInspectableTabs(tabs) {
+  const dashboardWindowId = currentDashboardTab && currentDashboardTab.windowId;
+  return tabs.sort(function byRelevance(a, b) {
+    const aSameWindow = a.windowId === dashboardWindowId ? 1 : 0;
+    const bSameWindow = b.windowId === dashboardWindowId ? 1 : 0;
+    if (aSameWindow !== bSameWindow) {
+      return bSameWindow - aSameWindow;
+    }
+    if (Boolean(a.active) !== Boolean(b.active)) {
+      return Number(b.active) - Number(a.active);
+    }
+    return Number(b.lastAccessed || 0) - Number(a.lastAccessed || 0);
+  });
+}
+
+function tabOptionLabel(tab) {
+  const url = tabUrl(tab);
+  let host = url;
+  try {
+    host = new URL(url).host;
+  } catch (_error) {
+    // Keep the full URL as a fallback label.
+  }
+  const title = String(tab.title || host || "Untitled page").trim();
+  return title === host ? title : title + " — " + host;
+}
+
+function setEmptyState(title, messageText) {
+  elements.emptyTitle.textContent = title;
+  elements.emptyMessage.textContent = messageText;
+}
+
+function renderTargetOptions() {
+  elements.targetTabSelect.replaceChildren();
+  if (!availableTabs.length) {
+    const option = document.createElement("option");
+    option.textContent = "No website tabs open";
+    option.value = "";
+    elements.targetTabSelect.append(option);
+    elements.targetTabSelect.disabled = true;
+    elements.focusTargetButton.disabled = true;
+    elements.liveIndicator.classList.add("is-idle");
+    elements.liveIndicator.title = "Open an HTTP or HTTPS website tab to inspect";
+    return;
+  }
+
+  for (const tab of availableTabs) {
+    const option = document.createElement("option");
+    option.value = String(tab.id);
+    option.textContent = tabOptionLabel(tab);
+    option.title = tabUrl(tab);
+    elements.targetTabSelect.append(option);
+  }
+  elements.targetTabSelect.disabled = false;
+  elements.focusTargetButton.disabled = inspectedTabId === null;
+  if (inspectedTabId !== null) {
+    elements.targetTabSelect.value = String(inspectedTabId);
+  }
+  elements.liveIndicator.classList.toggle(
+    "is-idle",
+    inspectedTabId === null
+  );
+  elements.liveIndicator.title =
+    inspectedTabId === null
+      ? "Choose a website tab to inspect"
+      : "Listening for the selected website tab";
+}
+
+async function loadCaptureForTarget() {
+  if (inspectedTabId === null) {
+    state.captures.clear();
+    state.selectedId = null;
+    renderRequestList();
+    renderDetail();
+    return;
+  }
+
+  const targetAtStart = inspectedTabId;
+  try {
+    const response = await message("GET_CAPTURE", { tabId: targetAtStart });
+    if (targetAtStart !== inspectedTabId) {
+      return;
+    }
+    state.captures = new Map(
+      (response.captures || []).map(function toEntry(capture) {
+        return [capture.id, capture];
+      })
+    );
+    const first = filteredCaptures()[0];
+    state.selectedId = first ? first.id : null;
+    renderRequestList();
+    renderDetail();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function selectTargetTab(tabId) {
+  const target = availableTabs.find(function matchingTab(tab) {
+    return tab.id === Number(tabId);
+  });
+
+  inspectedTabId = target ? target.id : null;
+  state.captures.clear();
+  state.selectedId = null;
+  renderTargetOptions();
+  renderRequestList();
+  renderDetail();
+
+  if (!target) {
+    history.replaceState(null, "", "panel.html");
+    document.title = "Headers Studio";
+    return;
+  }
+
+  history.replaceState(
+    null,
+    "",
+    "panel.html?tabId=" + encodeURIComponent(String(target.id))
+  );
+  document.title = "Headers Studio — " + (target.title || targetUrl(target));
+  await loadCaptureForTarget();
+}
+
+function targetUrl(tab) {
+  return tabUrl(tab) || "Website";
+}
+
+async function refreshWebsiteTabs(preferredTabId) {
+  const results = await Promise.all([
+    chrome.tabs.getCurrent(),
+    chrome.tabs.query({})
+  ]);
+  currentDashboardTab = results[0] || null;
+  availableTabs = sortInspectableTabs(
+    results[1].filter(function excludeDashboard(tab) {
+      return (
+        isInspectableTab(tab) &&
+        (!currentDashboardTab || tab.id !== currentDashboardTab.id)
+      );
+    })
+  );
+
+  const preferredIds = [
+    preferredTabId,
+    inspectedTabId,
+    currentDashboardTab && currentDashboardTab.openerTabId
+  ]
+    .filter(function present(id) {
+      return id !== null && id !== undefined && id !== "";
+    })
+    .map(Number)
+    .filter(function validId(id) {
+      return Number.isInteger(id) && id >= 0;
+    });
+  const target =
+    availableTabs.find(function preferred(tab) {
+      return preferredIds.includes(tab.id);
+    }) || availableTabs[0] || null;
+
+  if (!target || target.id !== inspectedTabId) {
+    await selectTargetTab(target && target.id);
+  } else {
+    renderTargetOptions();
+  }
+}
+
+function scheduleTabRefresh() {
+  clearTimeout(tabRefreshTimer);
+  tabRefreshTimer = setTimeout(function refreshSoon() {
+    void refreshWebsiteTabs(inspectedTabId).catch(function showRefreshError(
+      error
+    ) {
+      showToast(error.message, true);
+    });
+  }, 180);
 }
 
 function safeUrlParts(value) {
@@ -165,7 +372,9 @@ function renderRequestList() {
         "list-empty",
         total
           ? "No requests match the current filters."
-          : "Reload the inspected page to begin capturing traffic."
+          : inspectedTabId === null
+            ? "Open an HTTP or HTTPS website tab, then select it above."
+            : "Reload the selected website tab to begin capturing traffic."
       )
     );
     return;
@@ -277,6 +486,17 @@ function renderDetail() {
   elements.emptyDetail.hidden = Boolean(capture);
   elements.requestDetail.hidden = !capture;
   if (!capture) {
+    if (inspectedTabId === null) {
+      setEmptyState(
+        "Choose a website tab",
+        "Open an HTTP or HTTPS page in Chrome, then select it from the Inspecting menu."
+      );
+    } else {
+      setEmptyState(
+        "Waiting for a request",
+        "Reload the selected website tab. Request and response headers will appear here, including Cookie and Set-Cookie."
+      );
+    }
     return;
   }
 
@@ -467,16 +687,7 @@ async function refreshRules() {
 
 async function initialize() {
   try {
-    const response = await message("GET_CAPTURE", { tabId: inspectedTabId });
-    state.captures = new Map(
-      (response.captures || []).map(function toEntry(capture) {
-        return [capture.id, capture];
-      })
-    );
-    const first = filteredCaptures()[0];
-    state.selectedId = first ? first.id : null;
-    renderRequestList();
-    renderDetail();
+    await refreshWebsiteTabs(requestedTabId());
   } catch (error) {
     showToast(error.message, true);
   }
@@ -500,7 +711,36 @@ elements.typeFilter.addEventListener("change", function updateType(event) {
   renderRequestList();
 });
 
+elements.targetTabSelect.addEventListener(
+  "change",
+  function changeTarget(event) {
+    void selectTargetTab(Number(event.target.value));
+  }
+);
+
+elements.focusTargetButton.addEventListener(
+  "click",
+  async function focusTarget() {
+    if (inspectedTabId === null) {
+      return;
+    }
+    try {
+      const tab = await chrome.tabs.get(inspectedTabId);
+      await chrome.tabs.update(inspectedTabId, { active: true });
+      if (Number.isInteger(tab.windowId)) {
+        await chrome.windows.update(tab.windowId, { focused: true });
+      }
+    } catch (error) {
+      showToast(error.message, true);
+      scheduleTabRefresh();
+    }
+  }
+);
+
 elements.clearCaptureButton.addEventListener("click", async function clear() {
+  if (inspectedTabId === null) {
+    return;
+  }
   try {
     await message("CLEAR_CAPTURE", { tabId: inspectedTabId });
     state.captures.clear();
@@ -615,6 +855,17 @@ chrome.runtime.onMessage.addListener(function receiveCapture(message) {
   }
   renderRequestList();
   renderDetail();
+});
+
+chrome.tabs.onCreated.addListener(scheduleTabRefresh);
+chrome.tabs.onRemoved.addListener(scheduleTabRefresh);
+chrome.tabs.onUpdated.addListener(function trackTabUpdates(
+  _tabId,
+  changeInfo
+) {
+  if (changeInfo.title !== undefined || changeInfo.url !== undefined) {
+    scheduleTabRefresh();
+  }
 });
 
 updateValueField();

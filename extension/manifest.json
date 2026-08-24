@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Headers Studio",
   "short_name": "Headers Studio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Inspect, copy, and override Chrome request and response headers, including Cookie and Set-Cookie.",
   "minimum_chrome_version": "102",
   "permissions": [
@@ -17,10 +17,8 @@
   "background": {
     "service_worker": "background.js"
   },
-  "devtools_page": "devtools.html",
   "action": {
-    "default_title": "Headers Studio",
-    "default_popup": "popup.html",
+    "default_title": "Open Headers Studio",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"

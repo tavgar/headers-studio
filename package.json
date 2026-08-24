@@ -2,9 +2,9 @@
   "name": "headers-studio",
   "version": "1.0.0",
   "private": true,
-  "description": "A Chrome DevTools extension for inspecting, copying, and overriding HTTP headers.",
+  "description": "A full-page Chrome extension for inspecting, copying, and overriding HTTP headers.",
   "scripts": {
-    "check": "node --check extension/background.js && node --check extension/devtools.js && node --check extension/panel.js && node --check extension/popup.js && node --check extension/lib/headers.js && node --check extension/lib/rules.js",
+    "check": "node --check extension/background.js && node --check extension/panel.js && node --check extension/lib/headers.js && node --check extension/lib/rules.js",
     "test": "node --test"
   },
   "engines": {

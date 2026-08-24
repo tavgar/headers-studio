@@ -13,7 +13,7 @@
           <img src="icons/icon32.png" width="28" height="28" alt="">
           <div>
             <strong>Headers Studio</strong>
-            <span>Chrome-visible traffic, in plain HTTP</span>
+            <span>Full-page header inspector</span>
           </div>
         </div>
 
@@ -27,9 +27,26 @@
           </button>
         </nav>
 
-        <div class="live-indicator" title="Listening for this DevTools tab">
-          <span></span>
-          Live
+        <div class="target-area">
+          <label class="target-picker">
+            <span>Inspecting</span>
+            <select id="targetTabSelect" aria-label="Website tab to inspect">
+              <option>Loading website tabs…</option>
+            </select>
+          </label>
+          <button
+            id="focusTargetButton"
+            class="focus-target-button"
+            type="button"
+            title="Switch to the selected website tab"
+            aria-label="Switch to selected website tab"
+          >
+            ↗
+          </button>
+          <div id="liveIndicator" class="live-indicator" title="Listening for the selected website tab">
+            <span></span>
+            Live
+          </div>
         </div>
       </header>
 
@@ -69,10 +86,10 @@
           <section class="detail-pane">
             <div id="emptyDetail" class="empty-state">
               <div class="empty-mark">{ }</div>
-              <h1>Waiting for a request</h1>
-              <p>
-                Reload the inspected page. Request and response headers will
-                appear here, including Cookie and Set-Cookie.
+              <h1 id="emptyTitle">Waiting for a request</h1>
+              <p id="emptyMessage">
+                Reload the selected website tab. Request and response headers
+                will appear here, including Cookie and Set-Cookie.
               </p>
             </div>
 

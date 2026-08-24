@@ -403,6 +403,58 @@ chrome.tabs.onRemoved.addListener(function cleanClosedTab(tabId) {
   void chrome.storage.session.remove(captureStorageKey(tabId));
 });
 
+function dashboardUrl(targetTabId) {
+  const url = new URL(chrome.runtime.getURL("panel.html"));
+  if (Number.isInteger(targetTabId) && targetTabId >= 0) {
+    url.searchParams.set("tabId", String(targetTabId));
+  }
+  return url.toString();
+}
+
+async function openDashboard(sourceTab) {
+  const sourceTabId =
+    sourceTab && Number.isInteger(sourceTab.id) ? sourceTab.id : null;
+  const sourceWindowId =
+    sourceTab && Number.isInteger(sourceTab.windowId)
+      ? sourceTab.windowId
+      : undefined;
+  const baseUrl = chrome.runtime.getURL("panel.html");
+  const tabs = await chrome.tabs.query({});
+  const existing = tabs.find(function isDashboard(tab) {
+    return (
+      tab.windowId === sourceWindowId &&
+      typeof tab.url === "string" &&
+      tab.url.startsWith(baseUrl)
+    );
+  });
+
+  if (existing && Number.isInteger(existing.id)) {
+    await chrome.tabs.update(existing.id, {
+      active: true,
+      url: dashboardUrl(sourceTabId)
+    });
+    return;
+  }
+
+  const createProperties = {
+    active: true,
+    url: dashboardUrl(sourceTabId)
+  };
+  if (sourceWindowId !== undefined) {
+    createProperties.windowId = sourceWindowId;
+  }
+  if (sourceTabId !== null) {
+    createProperties.openerTabId = sourceTabId;
+  }
+  await chrome.tabs.create(createProperties);
+}
+
+chrome.action.onClicked.addListener(function showDashboard(tab) {
+  void openDashboard(tab).catch(function logOpenFailure(error) {
+    console.error("Could not open Headers Studio:", error);
+  });
+});
+
 chrome.runtime.onInstalled.addListener(function initialize() {
   void updateRuleBadge();
 });

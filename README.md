@@ -5,7 +5,7 @@
 <h1 align="center">Headers Studio</h1>
 
 <p align="center">
-  A focused Chrome DevTools extension for viewing, copying, and overriding HTTP
+  A full-page Chrome extension for viewing, copying, and overriding HTTP
   request and response headers — including <strong>Cookie</strong> and
   <strong>Set-Cookie</strong>.
 </p>
@@ -17,7 +17,9 @@
 
 ## What it does
 
-- Captures request and response headers for the inspected tab.
+- Captures request and response headers for the selected website tab.
+- Opens as a normal browser tab from the Chrome toolbar — no DevTools or F12.
+- Switches between open website tabs from an in-app target selector.
 - Includes Cookie and Set-Cookie by using Chrome's extraHeaders access.
 - Copies a request, a response, or both as CRLF-delimited raw HTTP headers.
 - Reconstructs the Host header when Chrome omits it from the observable list.
@@ -33,8 +35,10 @@
 3. Turn on **Developer mode**.
 4. Select **Load unpacked**.
 5. Choose the **extension** directory in this repository.
-6. Open DevTools on any page and select the **Headers Studio** panel.
-7. Reload the page to capture traffic.
+6. Pin **Headers Studio** to the Chrome toolbar.
+7. Open a website, then click the Headers Studio logo.
+8. Headers Studio opens in a normal tab with that website selected.
+9. Reload the selected website tab to capture traffic.
 
 ## Copying raw headers
 
