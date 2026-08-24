@@ -16,7 +16,7 @@ test("manifest is a Chrome Manifest V3 extension", function () {
   assert.equal(manifest.name, "Headers Studio");
   assert.equal(manifest.short_name, "Headers Studio");
   assert.equal(manifest.background.service_worker, "background.js");
-  assert.equal(manifest.version, "1.1.0");
+  assert.equal(manifest.version, "1.1.1");
   assert.equal("devtools_page" in manifest, false);
   assert.equal("default_popup" in manifest.action, false);
 });
@@ -86,4 +86,13 @@ test("every dashboard element queried by id exists in the page", function () {
   for (const id of queriedIds) {
     assert.match(panel, new RegExp('id="' + id + '"'), "#" + id + " should exist");
   }
+});
+
+test("hidden dashboard states cannot block pointer input", function () {
+  const css = fs.readFileSync(path.join(extensionRoot, "panel.css"), "utf8");
+
+  assert.match(
+    css,
+    /\[hidden\]\s*\{[^}]*display:\s*none\s*!important;/s
+  );
 });
