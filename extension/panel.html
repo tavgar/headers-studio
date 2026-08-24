@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Headers Studio</title>
+    <link rel="stylesheet" href="panel.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <img src="icons/icon32.png" width="28" height="28" alt="">
+          <div>
+            <strong>Headers Studio</strong>
+            <span>Chrome-visible traffic, in plain HTTP</span>
+          </div>
+        </div>
+
+        <nav class="view-tabs" aria-label="Views">
+          <button class="view-tab is-active" data-view="traffic" type="button">
+            Traffic
+          </button>
+          <button class="view-tab" data-view="overrides" type="button">
+            Overrides
+            <span id="ruleCountBadge" class="count-badge">0</span>
+          </button>
+        </nav>
+
+        <div class="live-indicator" title="Listening for this DevTools tab">
+          <span></span>
+          Live
+        </div>
+      </header>
+
+      <main>
+        <section id="trafficView" class="view is-active" aria-label="Traffic">
+          <aside class="request-sidebar">
+            <div class="sidebar-tools">
+              <label class="search-box">
+                <span aria-hidden="true">⌕</span>
+                <input
+                  id="searchInput"
+                  type="search"
+                  placeholder="Filter URL, method, status…"
+                  autocomplete="off"
+                >
+              </label>
+              <select id="typeFilter" aria-label="Filter by request type">
+                <option value="all">All types</option>
+                <option value="main_frame">Documents</option>
+                <option value="xmlhttprequest">Fetch / XHR</option>
+                <option value="script">Scripts</option>
+                <option value="image">Images</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div class="sidebar-summary">
+              <span id="requestCount">0 requests</span>
+              <button id="clearCaptureButton" class="text-button" type="button">
+                Clear
+              </button>
+            </div>
+
+            <div id="requestList" class="request-list" role="listbox"></div>
+          </aside>
+
+          <section class="detail-pane">
+            <div id="emptyDetail" class="empty-state">
+              <div class="empty-mark">{ }</div>
+              <h1>Waiting for a request</h1>
+              <p>
+                Reload the inspected page. Request and response headers will
+                appear here, including Cookie and Set-Cookie.
+              </p>
+            </div>
+
+            <article id="requestDetail" class="request-detail" hidden>
+              <div class="detail-topbar">
+                <div class="request-title">
+                  <div class="request-title-line">
+                    <span id="detailMethod" class="method-pill">GET</span>
+                    <span id="detailStatus" class="status-pill">Pending</span>
+                  </div>
+                  <h1 id="detailUrl"></h1>
+                </div>
+                <div class="copy-actions">
+                  <button id="copyRequestButton" class="secondary-button" type="button">
+                    Copy request
+                  </button>
+                  <button id="copyResponseButton" class="secondary-button" type="button">
+                    Copy response
+                  </button>
+                  <button id="copyAllButton" class="primary-button" type="button">
+                    Copy all raw
+                  </button>
+                </div>
+              </div>
+
+              <div id="metadataRow" class="metadata-row"></div>
+
+              <div class="capture-note">
+                <span class="note-icon">i</span>
+                <span>
+                  Host is reconstructed when Chrome omits it. HTTP/2 and HTTP/3
+                  traffic is exported in readable HTTP/1.1-style syntax.
+                </span>
+                <label class="mask-toggle">
+                  <input id="maskSensitiveInput" type="checkbox">
+                  Mask secrets
+                </label>
+              </div>
+
+              <section class="header-section">
+                <div class="section-heading">
+                  <div>
+                    <h2>Request headers</h2>
+                    <span id="requestHeaderCount"></span>
+                  </div>
+                  <button
+                    class="icon-copy-button"
+                    data-copy="request"
+                    type="button"
+                    aria-label="Copy raw request headers"
+                    title="Copy raw request headers"
+                  >
+                    Copy raw
+                  </button>
+                </div>
+                <div id="requestHeaders" class="header-table"></div>
+              </section>
+
+              <section class="header-section">
+                <div class="section-heading">
+                  <div>
+                    <h2>Response headers</h2>
+                    <span id="responseHeaderCount"></span>
+                  </div>
+                  <button
+                    class="icon-copy-button"
+                    data-copy="response"
+                    type="button"
+                    aria-label="Copy raw response headers"
+                    title="Copy raw response headers"
+                  >
+                    Copy raw
+                  </button>
+                </div>
+                <div id="responseHeaders" class="header-table"></div>
+              </section>
+            </article>
+          </section>
+        </section>
+
+        <section id="overridesView" class="view overrides-view" aria-label="Overrides">
+          <div class="overrides-layout">
+            <section class="rule-composer card">
+              <p class="eyebrow">Manifest V3 · Dynamic rules</p>
+              <h1>Create a header override</h1>
+              <p class="lede">
+                Rules persist across browser restarts and run before matching
+                requests leave Chrome.
+              </p>
+
+              <form id="ruleForm" novalidate>
+                <label class="field field-wide">
+                  <span>URL filter</span>
+                  <input
+                    id="urlFilterInput"
+                    name="urlFilter"
+                    type="text"
+                    placeholder="||example.com/"
+                    autocomplete="off"
+                    required
+                  >
+                  <small>
+                    Examples: ||example.com/ or |https://api.example.com/
+                  </small>
+                </label>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Target</span>
+                    <select id="targetInput" name="target">
+                      <option value="request">Request</option>
+                      <option value="response">Response</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span>Operation</span>
+                    <select id="operationInput" name="operation">
+                      <option value="set">Set</option>
+                      <option value="append">Append</option>
+                      <option value="remove">Remove</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>Header name</span>
+                  <input
+                    id="headerInput"
+                    name="header"
+                    type="text"
+                    placeholder="x-debug-mode"
+                    autocomplete="off"
+                    required
+                  >
+                </label>
+
+                <label id="valueField" class="field">
+                  <span>Header value</span>
+                  <textarea
+                    id="valueInput"
+                    name="value"
+                    rows="3"
+                    placeholder="enabled"
+                    spellcheck="false"
+                  ></textarea>
+                </label>
+
+                <div id="ruleError" class="form-error" role="alert" hidden></div>
+
+                <button class="primary-button submit-rule" type="submit">
+                  Add override
+                </button>
+              </form>
+            </section>
+
+            <section class="active-rules card">
+              <div class="rules-heading">
+                <div>
+                  <p class="eyebrow">Active now</p>
+                  <h2>Header overrides</h2>
+                </div>
+                <button id="clearRulesButton" class="text-button danger" type="button">
+                  Remove all
+                </button>
+              </div>
+
+              <div id="rulesEmpty" class="rules-empty">
+                No overrides yet. Create one to change matching traffic.
+              </div>
+              <div id="rulesList" class="rules-list"></div>
+            </section>
+          </div>
+
+          <div class="rule-footnote">
+            <strong>Chrome boundary:</strong>
+            rules cannot rewrite responses served entirely by a page service
+            worker or reverse security decisions Chrome already made.
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="lib/headers.js"></script>
+    <script src="lib/rules.js"></script>
+    <script src="panel.js"></script>
+  </body>
+</html>
